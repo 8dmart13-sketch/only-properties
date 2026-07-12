@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1E4634" />
+<title>Only Properties — Route Scheduler</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#EEF0E7; --card:#F8F9F3; --ink:#16241B; --muted:#5E6B5A;
+    --pine:#1E4634; --pine-2:#2F6D4F; --sage:#DDE4D3; --line:#D6DCC9;
+    --amber:#C6632E; --greenpal:#3B7A57; --lawnlove:#2E6DA6; --manual:#8A7A55;
+    --shadow:0 1px 2px rgba(22,36,27,.08),0 8px 24px rgba(22,36,27,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.45;
+  }
+  h1,h2,h3{font-family:Fraunces,Georgia,serif; font-weight:600; letter-spacing:-.01em; margin:0}
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+  input,select,textarea{font-family:inherit; font-size:16px}
+
+  /* ---- app shell ---- */
+  header.app{
+    position:sticky; top:0; z-index:50; background:var(--pine); color:#F1F4EC;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
+    box-shadow:0 1px 0 rgba(0,0,0,.15);
+  }
+  .brand{display:flex; align-items:center; gap:10px}
+  .brand .mark{width:26px;height:26px;flex:0 0 auto}
+  .brand h1{font-size:20px; color:#F1F4EC}
+  .brand .tag{font-size:12px; color:#B9CBB7; margin-left:auto; font-weight:500}
+  nav.tabs{display:flex; gap:4px; margin-top:12px}
+  nav.tabs button{
+    flex:1; padding:9px 8px; border-radius:10px; font-size:13px; font-weight:600;
+    color:#C6D6C2; background:rgba(255,255,255,.06);
+  }
+  nav.tabs button.active{background:#F1F4EC; color:var(--pine)}
+
+  main{max-width:760px; margin:0 auto; padding:16px 14px 96px}
+
+  .fab{
+    position:fixed; right:18px; bottom:calc(env(safe-area-inset-bottom) + 18px); z-index:60;
+    background:var(--amber); color:#fff; border-radius:999px; padding:14px 20px;
+    font-weight:600; font-size:15px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center;
+  }
+
+  /* ---- calendar ---- */
+  .cal-head{display:flex; align-items:center; gap:8px; margin-bottom:12px}
+  .cal-head h2{font-size:22px; flex:1}
+  .cal-head button{
+    width:38px;height:38px;border-radius:10px;background:var(--card);
+    box-shadow:var(--shadow); font-size:18px; color:var(--pine)
+  }
+  .cal-head .today-btn{width:auto; padding:0 14px; font-size:13px; font-weight:600}
+  .grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
+  .dow{font-size:11px; font-weight:600; color:var(--muted); text-align:center; padding-bottom:2px; text-transform:uppercase; letter-spacing:.04em}
+  .cell{
+    background:var(--card); border-radius:10px; min-height:66px; padding:6px 5px;
+    border:1px solid transparent; overflow:hidden; text-align:left;
+  }
+  .cell.dim{background:transparent; border-color:var(--line); opacity:.55}
+  .cell.today{border-color:var(--pine-2); box-shadow:inset 0 0 0 1px var(--pine-2)}
+  .cell .num{font-size:12px; font-weight:600; color:var(--muted)}
+  .cell.today .num{color:var(--pine-2)}
+  .pill{
+    display:flex; align-items:center; gap:4px; font-size:11px; font-weight:500;
+    padding:2px 4px; border-radius:6px; background:var(--sage); color:var(--ink);
+    margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pill.overdue{background:#F2DCCB; color:var(--amber)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .more{font-size:10px;color:var(--muted);margin-top:2px}
+
+  /* ---- lists / cards ---- */
+  .section-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:18px 2px 8px}
+  .row{
+    display:flex; align-items:center; gap:12px; background:var(--card);
+    border-radius:var(--radius); padding:13px 14px; box-shadow:var(--shadow); margin-bottom:8px;
+  }
+  .row .swatch{width:10px;height:38px;border-radius:5px;flex:0 0 auto}
+  .row .body{flex:1; min-width:0}
+  .row .body .name{font-weight:600; font-size:15px}
+  .row .body .sub{font-size:12.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .row .cad{font-size:11px;font-weight:600;color:var(--pine);background:var(--sage);padding:4px 8px;border-radius:999px;white-space:nowrap}
+  .row.tap{cursor:pointer}
+  .empty{text-align:center; color:var(--muted); padding:48px 20px}
+  .empty h3{font-size:18px;color:var(--ink);margin-bottom:6px}
+
+  /* ---- map ---- */
+  #map{height:62vh; border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
+  .map-note{font-size:12px;color:var(--muted);margin-top:10px;text-align:center}
+
+  /* ---- modal / drawer ---- */
+  .scrim{position:fixed; inset:0; background:rgba(16,24,17,.44); z-index:100; display:none}
+  .scrim.show{display:block}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:101; background:var(--paper);
+    border-radius:20px 20px 0 0; padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);
+    max-height:92vh; overflow:auto; transform:translateY(100%); transition:transform .24s ease;
+    max-width:760px; margin:0 auto;
+  }
+  .sheet.show{transform:translateY(0)}
+  .sheet h2{font-size:20px;margin-bottom:14px}
+  .grip{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+  label.field{display:block;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--muted)}
+  label.field input,label.field select,label.field textarea{
+    display:block;width:100%;margin-top:5px;padding:11px 12px;border:1px solid var(--line);
+    border-radius:10px;background:var(--card);color:var(--ink);font-weight:500;
+  }
+  label.field textarea{min-height:64px;resize:vertical}
+  .two{display:flex;gap:10px}
+  .two>*{flex:1}
+  .cad-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+  .cad-row button{padding:8px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
+  .cad-row button.on{background:var(--pine);color:#fff;border-color:var(--pine)}
+  .btn{display:block;width:100%;padding:14px;border-radius:12px;background:var(--pine);color:#fff;font-weight:600;font-size:15px;margin-top:6px}
+  .btn.ghost{background:transparent;color:var(--amber);box-shadow:none}
+  .btn.line{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .visit{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .visit:last-child{border-bottom:none}
+  .visit .body{flex:1;min-width:0}
+  .visit .body .name{font-weight:600}
+  .visit .body .sub{font-size:12.5px;color:var(--muted)}
+  .visit .acts{display:flex;gap:6px}
+  .visit .acts button{width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line);font-size:15px}
+  .badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;color:#fff}
+  .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:14px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .demo-tag{font-size:11px;color:var(--muted);text-align:center;margin-top:20px}
+
+  /* ---- today screen ---- */
+  .today-head{background:var(--pine);color:#EEF0E7;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .today-date{font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:600;margin-bottom:12px}
+  .stat-row{display:flex;gap:10px}
+  .stat{flex:1;background:rgba(255,255,255,.08);border-radius:12px;padding:10px 8px;text-align:center}
+  .stat .n{font-size:19px;font-weight:700}
+  .stat .l{font-size:11px;color:#B9CBB7;margin-top:2px}
+  .row .acts{display:flex;gap:6px;align-items:center}
+  .row .acts button,.row .acts .navbtn{
+    width:40px;height:40px;border-radius:11px;background:var(--card);border:1px solid var(--line);
+    font-size:16px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--pine)
+  }
+  .row .acts .navbtn{background:var(--pine);color:#fff;border-color:var(--pine)}
+
+  /* ---- lock screen ---- */
+  #lock{
+    position:fixed; inset:0; z-index:500; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%, #2F6D4F 0%, #1E4634 55%, #16241B 100%);
+    padding:24px;
+  }
+  #lock.hidden{display:none}
+  .lock-card{width:100%; max-width:320px; text-align:center; color:#EEF0E7}
+  .lock-card .mark{width:52px;height:52px;margin-bottom:14px}
+  .lock-card h1{font-size:26px;color:#F1F4EC;margin-bottom:4px}
+  .lock-card p{font-size:13.5px;color:#B9CBB7;margin:0 0 22px}
+  .lock-card input{
+    width:100%; text-align:center; letter-spacing:.4em; font-size:22px; font-weight:600;
+    padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.08); color:#fff; margin-bottom:12px;
+  }
+  .lock-card input::placeholder{letter-spacing:normal;font-weight:400;color:#8FA88C}
+  .lock-card .err{color:#F2C4A6;font-size:13px;height:18px;margin-bottom:8px;display:none}
+  .lock-card .btn{background:#EEF0E7;color:var(--pine)}
+</style>
+</head>
+<body>
+<div id="lock">
+  <div class="lock-card">
+    <svg class="mark" viewBox="0 0 24 24" fill="none"><path d="M12 2C9 6 5 8 5 13a7 7 0 0014 0c0-5-4-7-7-11z" fill="#8FD19E"/><path d="M12 22V12" stroke="#EEF0E7" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <h1>Only Properties</h1>
+    <p>Enter passcode to continue</p>
+    <input id="pcInput" type="password" inputmode="numeric" autocomplete="off" placeholder="passcode" />
+    <div class="err" id="pcErr">Incorrect passcode</div>
+    <button class="btn" id="pcBtn">Unlock</button>
+  </div>
+</div>
+<header class="app">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 24 24" fill="none"><path d="M12 2C9 6 5 8 5 13a7 7 0 0014 0c0-5-4-7-7-11z" fill="#8FD19E"/><path d="M12 22V12" stroke="#1E4634" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <h1>Only Properties</h1>
+    <span class="tag" id="modeTag">demo mode</span>
+  </div>
+  <nav class="tabs">
+    <button data-view="today" class="active">Today</button>
+    <button data-view="schedule">Schedule</button>
+    <button data-view="customers">Customers</button>
+    <button data-view="map">Map</button>
+  </nav>
+</header>
+
+<main id="main"></main>
+
+<button class="fab" id="addFab">＋ Customer</button>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Firebase (only used once you paste keys below; app runs fine without it) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+/* ============================================================
+   1) FIREBASE  — paste your friend's project keys here to make
+   data persist + sync across devices and let the email script
+   write in. Leave blank to run in local demo mode.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDgUGt5Zd-DiJkR31SGEVZ6AyAR0ONtRgQ",
+  authDomain: "only-properties.firebaseapp.com",
+  databaseURL: "https://only-properties-default-rtdb.firebaseio.com",
+  projectId: "only-properties",
+  storageBucket: "only-properties.firebasestorage.app",
+  messagingSenderId: "587045041486",
+  appId: "1:587045041486:web:6bde03a017c1df92319a1f"
+};
+
+/* Passcode to open the app. Change this to whatever you want him to use. */
+const PASSCODE = "9999";
+
+let fb = null;
+const usingFirebase = !!FIREBASE_CONFIG.databaseURL;
+if (usingFirebase) {
+  try { firebase.initializeApp(FIREBASE_CONFIG); fb = firebase.database().ref('routebook'); }
+  catch (e) { console.warn('Firebase init failed, staying local:', e); }
+}
+
+/* ============================================================
+   2) STATE + STORAGE
+   ============================================================ */
+let state = { customers:{}, overrides:{}, done:{} };
+const SOURCES = {
+  greenpal:{label:'GreenPal', color:'var(--greenpal)'},
+  lawnlove:{label:'Lawn Love', color:'var(--lawnlove)'},
+  manual:{label:'Manual', color:'var(--manual)'}
+};
+
+function uid(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+async function loadAll(){
+  if (fb){
+    try{
+      const snap = await fb.get();
+      const v = snap.val() || {};
+      state.customers = v.customers || {};
+      state.overrides = v.overrides || {};
+      state.done = v.done || {};
+      return;
+    }catch(e){ console.warn('load failed', e); }
+  }
+  if (Object.keys(state.customers).length === 0) seedDemo();
+}
+async function saveCustomer(c){
+  state.customers[c.id] = c;
+  if (fb) try{ await fb.child('customers/'+c.id).set(c); }catch(e){}
+}
+async function deleteCustomer(id){
+  delete state.customers[id];
+  if (fb) try{ await fb.child('customers/'+id).remove(); }catch(e){}
+}
+async function setOverride(key,val){
+  if (val===null){ delete state.overrides[key]; if(fb) try{await fb.child('overrides/'+key).remove();}catch(e){} }
+  else { state.overrides[key]=val; if(fb) try{await fb.child('overrides/'+key).set(val);}catch(e){} }
+}
+async function toggleDone(key){
+  if (state.done[key]){ delete state.done[key]; if(fb) try{await fb.child('done/'+key).remove();}catch(e){} }
+  else { state.done[key]=true; if(fb) try{await fb.child('done/'+key).set(true);}catch(e){} }
+}
+
+function seedDemo(){
+  const t = new Date(); const iso=d=>fmtISO(d);
+  const mk=(name,addr,lat,lng,iv,offset,src)=>{
+    const id=uid();
+    state.customers[id]={id,name,address:addr,lat,lng,phone:'',price:'',
+      intervalDays:iv,anchorDate:iso(addDays(t,offset)),notes:'',active:true,source:src};
+  };
+  mk('Sample — Ridgeway','118 Ridgeway Dr',32.45,-99.78,7,-2,'greenpal');
+  mk('Sample — Elm Court','2043 Elm Ct',32.43,-99.80,10,1,'lawnlove');
+  mk('Sample — Oak Hollow','77 Oak Hollow Ln',32.41,-99.75,30,3,'greenpal');
+  mk('Sample — Cedar Bend','905 Cedar Bend',32.46,-99.82,14,5,'manual');
+}
+
+/* ============================================================
+   3) DATES + RECURRENCE
+   ============================================================ */
+function fmtISO(d){ const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+function parseISO(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function sameDay(a,b){ return fmtISO(a)===fmtISO(b); }
+function todayMid(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// base occurrences for one customer in [start,end]
+function baseOccurrences(c,start,end){
+  const out=[]; if(!c.anchorDate||!c.intervalDays||!c.active) return out;
+  const anchor=parseISO(c.anchorDate); const iv=Number(c.intervalDays);
+  let first;
+  if(anchor>=start) first=anchor;
+  else{ const steps=Math.ceil((start-anchor)/(86400000*iv)); first=addDays(anchor,steps*iv); }
+  for(let d=new Date(first); d<=end; d=addDays(d,iv)) out.push(new Date(d));
+  return out;
+}
+// resolved visits (overrides + moved-in) for range
+function visitsInRange(start,end){
+  const visits=[]; // {cust, dateISO, origISO, moved, cancelled}
+  const pad=45;
+  for(const id in state.customers){
+    const c=state.customers[id];
+    const occ=baseOccurrences(c,addDays(start,-pad),addDays(end,pad));
+    for(const d of occ){
+      const origISO=fmtISO(d);
+      const ov=state.overrides[id+'@'+origISO];
+      if(ov&&ov.type==='cancelled') continue;
+      let dateISO=origISO, moved=false;
+      if(ov&&ov.type==='moved'){ dateISO=ov.to; moved=true; }
+      const dd=parseISO(dateISO);
+      if(dd<start||dd>end) continue;
+      visits.push({cust:c,dateISO,origISO,moved});
+    }
+  }
+  return visits;
+}
+function visitsByDate(start,end){
+  const map={};
+  for(const v of visitsInRange(start,end)){ (map[v.dateISO]=map[v.dateISO]||[]).push(v); }
+  for(const k in map) map[k].sort((a,b)=>a.cust.name.localeCompare(b.cust.name));
+  return map;
+}
+
+/* ============================================================
+   4) VIEWS
+   ============================================================ */
+let currentView='today';
+let calRef=todayMid(); // any date inside the shown month
+const main=document.getElementById('main');
+
+function render(){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
+  if(currentView==='today') renderToday();
+  else if(currentView==='schedule') renderSchedule();
+  else if(currentView==='customers') renderCustomers();
+  else renderMap();
+}
+
+/* ---- money + navigation helpers ---- */
+function parsePrice(p){ if(p==null) return 0; const m=String(p).match(/[\d.]+/); return m?parseFloat(m[0]):0; }
+function moneyFmt(n){ return '$'+(Math.round(n*100)/100).toLocaleString(undefined,{maximumFractionDigits:2}); }
+function weekRange(){ const t=todayMid(); const s=addDays(t,-t.getDay()); return [s,addDays(s,6)]; }
+function navUrl(v){
+  const dest=(v.cust.lat&&v.cust.lng)?(v.cust.lat+','+v.cust.lng):encodeURIComponent(v.cust.address||'');
+  return 'https://www.google.com/maps/dir/?api=1&destination='+dest;
+}
+
+function renderToday(){
+  const t=todayMid(), iso=fmtISO(t);
+  const todays=(visitsByDate(t,t)[iso]||[]);
+  const [ws,we]=weekRange();
+  const todayEarn=todays.reduce((s,v)=>s+parsePrice(v.cust.price),0);
+  const weekEarn=visitsInRange(ws,we).reduce((s,v)=>s+parsePrice(v.cust.price),0);
+  const dLabel=`${DOW[t.getDay()]}, ${MONTHS[t.getMonth()]} ${t.getDate()}`;
+
+  const rows=todays.length? todays.map(v=>{
+    const doneKey=v.cust.id+'@'+v.origISO, isDone=!!state.done[doneKey];
+    const s=SOURCES[v.cust.source]||SOURCES.manual, price=parsePrice(v.cust.price);
+    return `<div class="row">
+      <div class="swatch" style="background:${s.color}"></div>
+      <div class="body" data-open="${iso}" style="cursor:pointer">
+        <div class="name" style="${isDone?'text-decoration:line-through;opacity:.55':''}">${esc(v.cust.name)}</div>
+        <div class="sub">${esc(v.cust.address||'no address')}${price?' · '+moneyFmt(price):''}</div>
+      </div>
+      <div class="acts">
+        ${(v.cust.address||v.cust.lat)?`<a class="navbtn" href="${navUrl(v)}" target="_blank" rel="noopener" title="Navigate">➤</a>`:''}
+        <button title="Done" data-tdone="${doneKey}">${isDone?'↺':'✓'}</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty"><h3>No stops today</h3><div>Enjoy the day off — check the Schedule tab for what's coming up.</div></div>`;
+
+  main.innerHTML=`
+    <div class="today-head">
+      <div class="today-date">${dLabel}</div>
+      <div class="stat-row">
+        <div class="stat"><div class="n">${todays.length}</div><div class="l">stops today</div></div>
+        <div class="stat"><div class="n">${moneyFmt(todayEarn)}</div><div class="l">today</div></div>
+        <div class="stat"><div class="n">${moneyFmt(weekEarn)}</div><div class="l">this week</div></div>
+      </div>
+    </div>
+    ${rows}
+  `;
+  main.querySelectorAll('[data-tdone]').forEach(b=>b.onclick=async()=>{await toggleDone(b.dataset.tdone);render();});
+  main.querySelectorAll('.body[data-open]').forEach(el=>el.onclick=()=>openDay(el.dataset.open));
+}
+
+function renderSchedule(){
+  const y=calRef.getFullYear(), m=calRef.getMonth();
+  const first=new Date(y,m,1), last=new Date(y,m+1,0);
+  const gridStart=addDays(first,-first.getDay());
+  const gridEnd=addDays(last,6-last.getDay());
+  const byDate=visitsByDate(gridStart,gridEnd);
+  const today=todayMid();
+
+  let cells='';
+  for(let d=new Date(gridStart); d<=gridEnd; d=addDays(d,1)){
+    const inMonth=d.getMonth()===m;
+    const iso=fmtISO(d);
+    const vs=byDate[iso]||[];
+    let pills='';
+    vs.slice(0,3).forEach(v=>{
+      const overdue = parseISO(iso)<today && !state.done[v.cust.id+'@'+v.origISO];
+      const col=(SOURCES[v.cust.source]||SOURCES.manual).color;
+      pills+=`<div class="pill ${overdue?'overdue':''}"><span class="dot" style="background:${col}"></span>${esc(shortName(v.cust.name))}</div>`;
+    });
+    if(vs.length>3) pills+=`<div class="more">+${vs.length-3} more</div>`;
+    cells+=`<button class="cell ${inMonth?'':'dim'} ${sameDay(d,today)?'today':''}" data-day="${iso}">
+      <div class="num">${d.getDate()}</div>${pills}</button>`;
+  }
+
+  main.innerHTML=`
+    <div class="cal-head">
+      <h2>${MONTHS[m]} ${y}</h2>
+      <button class="today-btn" id="calToday">Today</button>
+      <button id="calPrev">‹</button>
+      <button id="calNext">›</button>
+    </div>
+    <div class="grid">${DOW.map(d=>`<div class="dow">${d}</div>`).join('')}${cells}</div>
+    ${Object.keys(state.customers).length===0?emptyState():''}
+    <div class="demo-tag">${fb?'Synced to Firebase':'Demo mode — add your Firebase keys to save &amp; sync'}</div>
+  `;
+  document.getElementById('calPrev').onclick=()=>{calRef=new Date(y,m-1,1);render();};
+  document.getElementById('calNext').onclick=()=>{calRef=new Date(y,m+1,1);render();};
+  document.getElementById('calToday').onclick=()=>{calRef=todayMid();render();};
+  main.querySelectorAll('.cell[data-day]').forEach(c=>c.onclick=()=>openDay(c.dataset.day));
+}
+
+function shortName(n){ return n.replace(/^Sample —\s*/,''); }
+
+function openDay(iso){
+  const d=parseISO(iso);
+  const vs=(visitsByDate(d,d)[iso]||[]);
+  const label=`${DOW[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  let rows = vs.length? vs.map(v=>{
+    const doneKey=v.cust.id+'@'+v.origISO;
+    const isDone=!!state.done[doneKey];
+    const col=(SOURCES[v.cust.source]||SOURCES.manual).color;
+    return `<div class="visit">
+      <span class="badge" style="background:${col}">${(SOURCES[v.cust.source]||SOURCES.manual).label}</span>
+      <div class="body">
+        <div class="name" style="${isDone?'text-decoration:line-through;opacity:.55':''}">${esc(v.cust.name)}${v.moved?' · moved':''}</div>
+        <div class="sub">${esc(v.cust.address||'no address')} · every ${v.cust.intervalDays}d</div>
+      </div>
+      <div class="acts">
+        <button title="Done" data-done="${doneKey}">${isDone?'↺':'✓'}</button>
+        <button title="Reschedule" data-move="${v.cust.id}|${v.origISO}">⇄</button>
+        <button title="Skip" data-skip="${v.cust.id}|${v.origISO}">✕</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty" style="padding:26px"><h3>No visits</h3><div>Nothing scheduled for this day.</div></div>`;
+
+  openSheet(`<h2>${label}</h2>${rows}<button class="btn line" id="closeSheet" style="margin-top:14px">Close</button>`);
+  document.getElementById('closeSheet').onclick=closeSheet;
+  document.querySelectorAll('[data-done]').forEach(b=>b.onclick=async()=>{await toggleDone(b.dataset.done);openDay(iso);render();});
+  document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=async()=>{
+    const [id,orig]=b.dataset.skip.split('|');
+    await setOverride(id+'@'+orig,{type:'cancelled'}); toast('Visit skipped'); openDay(iso); render();
+  });
+  document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{
+    const [id,orig]=b.dataset.move.split('|'); moveVisit(id,orig);
+  });
+}
+
+function moveVisit(id,orig){
+  const cur=state.overrides[id+'@'+orig];
+  const val=cur&&cur.to?cur.to:orig;
+  openSheet(`<h2>Reschedule visit</h2>
+    <label class="field">New date<input type="date" id="mvDate" value="${val}"></label>
+    <button class="btn" id="mvSave">Move only this visit</button>
+    <button class="btn line" id="mvSaveAll" style="margin-top:8px">Move this &amp; all future</button>
+    <button class="btn line" id="mvReset" style="margin-top:8px">Reset to normal</button>
+    <button class="btn ghost" id="mvCancel">Cancel</button>`);
+  document.getElementById('mvSave').onclick=async()=>{
+    const to=document.getElementById('mvDate').value; if(!to)return;
+    await setOverride(id+'@'+orig, to===orig?null:{type:'moved',to});
+    toast('Visit moved'); closeSheet(); render();
+  };
+  document.getElementById('mvSaveAll').onclick=async()=>{
+    const to=document.getElementById('mvDate').value; if(!to)return;
+    const c=state.customers[id]; if(!c)return;
+    // clear this + future one-off overrides, then re-anchor the recurring series
+    for(const k of Object.keys(state.overrides)){
+      if(k.startsWith(id+'@') && k.split('@')[1] >= orig) await setOverride(k,null);
+    }
+    c.anchorDate=to; await saveCustomer(c);
+    toast('Series shifted going forward'); closeSheet(); render();
+  };
+  document.getElementById('mvReset').onclick=async()=>{await setOverride(id+'@'+orig,null);toast('Back to normal');closeSheet();render();};
+  document.getElementById('mvCancel').onclick=closeSheet;
+}
+
+function renderCustomers(){
+  const list=Object.values(state.customers).sort((a,b)=>a.name.localeCompare(b.name));
+  if(list.length===0){ main.innerHTML=emptyState(); return; }
+  const active=list.filter(c=>c.active), paused=list.filter(c=>!c.active);
+  const card=c=>{
+    const s=SOURCES[c.source]||SOURCES.manual;
+    const next=nextVisit(c);
+    return `<div class="row tap" data-edit="${c.id}">
+      <div class="swatch" style="background:${s.color}"></div>
+      <div class="body">
+        <div class="name">${esc(c.name)}</div>
+        <div class="sub">${esc(c.address||'no address')}${next?' · next '+prettyDate(next):''}</div>
+      </div>
+      <span class="cad">${cadenceLabel(c.intervalDays)}</span>
+    </div>`;
+  };
+  main.innerHTML=`
+    <div class="section-label">Active routes · ${active.length}</div>
+    ${active.map(card).join('')||'<div class="empty" style="padding:20px">No active routes yet.</div>'}
+    ${paused.length?`<div class="section-label">Paused</div>${paused.map(card).join('')}`:''}
+  `;
+  main.querySelectorAll('[data-edit]').forEach(r=>r.onclick=()=>editCustomer(r.dataset.edit));
+}
+
+function nextVisit(c){
+  const t=todayMid();
+  const occ=baseOccurrences(c,t,addDays(t,400));
+  for(const d of occ){
+    const ov=state.overrides[c.id+'@'+fmtISO(d)];
+    if(ov&&ov.type==='cancelled') continue;
+    return ov&&ov.type==='moved'?parseISO(ov.to):d;
+  }
+  return null;
+}
+function cadenceLabel(iv){ iv=Number(iv);
+  if(iv===7)return 'Weekly'; if(iv===14)return 'Biweekly'; if(iv===30||iv===31)return 'Monthly';
+  return 'Every '+iv+'d';
+}
+function prettyDate(d){ return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; }
+
+let mapObj=null, markers=[];
+function renderMap(){
+  main.innerHTML=`<div id="map"></div><div class="map-note">Pins come from each customer's address. Tap a pin for details.</div>`;
+  setTimeout(()=>{
+    try{
+      const pts=Object.values(state.customers).filter(c=>c.lat&&c.lng);
+      mapObj=L.map('map',{scrollWheelZoom:false});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapObj);
+      if(pts.length){
+        const group=[];
+        pts.forEach(c=>{
+          const s=SOURCES[c.source]||SOURCES.manual;
+          const mk=L.circleMarker([c.lat,c.lng],{radius:9,color:'#fff',weight:2,fillColor:cssVar(s.color),fillOpacity:1}).addTo(mapObj);
+          mk.bindPopup(`<b>${esc(c.name)}</b><br>${esc(c.address||'')}<br>${cadenceLabel(c.intervalDays)}`);
+          group.push([c.lat,c.lng]);
+        });
+        mapObj.fitBounds(group,{padding:[40,40],maxZoom:14});
+      } else { mapObj.setView([32.44,-99.79],11); }
+    }catch(e){ main.innerHTML+=`<div class="map-note">Map needs an internet connection (works once hosted).</div>`; }
+  },40);
+}
+function cssVar(v){ if(!v.startsWith('var('))return v; return getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim(); }
+
+function emptyState(){
+  return `<div class="empty"><h3>No customers yet</h3><div>Tap “＋ Customer” to add your first route. Set their address and how often you mow — Routebook fills in every visit ahead.</div></div>`;
+}
+
+/* ---- add / edit customer ---- */
+function editCustomer(id){ openCustomerForm(state.customers[id]); }
+function openCustomerForm(c){
+  const isNew=!c;
+  c=c||{id:uid(),name:'',address:'',phone:'',price:'',intervalDays:7,anchorDate:fmtISO(todayMid()),notes:'',active:true,source:'manual',lat:null,lng:null};
+  const presets=[['Weekly',7],['Biweekly',14],['Every 10',10],['Monthly',30]];
+  openSheet(`
+    <h2>${isNew?'New customer':'Edit customer'}</h2>
+    <label class="field">Name<input id="fName" value="${esc(c.name)}" placeholder="Customer name"></label>
+    <label class="field">Address<input id="fAddr" value="${esc(c.address)}" placeholder="Street, City"></label>
+    <div class="two">
+      <label class="field">Phone<input id="fPhone" value="${esc(c.phone||'')}" placeholder="optional"></label>
+      <label class="field">Price<input id="fPrice" value="${esc(c.price||'')}" placeholder="$"></label>
+    </div>
+    <label class="field">How often
+      <div class="cad-row" id="cadRow">
+        ${presets.map(p=>`<button data-iv="${p[1]}" class="${Number(c.intervalDays)===p[1]?'on':''}">${p[0]}</button>`).join('')}
+        <button data-iv="custom" class="${![7,14,10,30].includes(Number(c.intervalDays))?'on':''}">Custom</button>
+      </div>
+    </label>
+    <label class="field" id="customWrap" style="${[7,14,10,30].includes(Number(c.intervalDays))?'display:none':''}">Every N days<input type="number" id="fIv" min="1" value="${c.intervalDays}"></label>
+    <label class="field">First / next visit<input type="date" id="fAnchor" value="${c.anchorDate}"></label>
+    <label class="field">Source
+      <select id="fSource">
+        <option value="manual"${c.source==='manual'?' selected':''}>Manual</option>
+        <option value="greenpal"${c.source==='greenpal'?' selected':''}>GreenPal</option>
+        <option value="lawnlove"${c.source==='lawnlove'?' selected':''}>Lawn Love</option>
+      </select>
+    </label>
+    <label class="field">Notes<textarea id="fNotes" placeholder="Gate code, dog, etc.">${esc(c.notes||'')}</textarea></label>
+    ${!isNew?`<label class="field" style="display:flex;align-items:center;gap:8px;flex-direction:row"><input type="checkbox" id="fActive" ${c.active?'checked':''} style="width:auto;margin:0"> Active</label>`:''}
+    <button class="btn" id="saveCust">${isNew?'Add customer':'Save changes'}</button>
+    ${!isNew?`<button class="btn ghost" id="delCust">Delete customer</button>`:`<button class="btn line" id="cancelCust" style="margin-top:8px">Cancel</button>`}
+  `);
+  let chosen=Number(c.intervalDays);
+  const cadRow=document.getElementById('cadRow'), customWrap=document.getElementById('customWrap');
+  cadRow.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    cadRow.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    if(b.dataset.iv==='custom'){ customWrap.style.display='block'; chosen='custom'; }
+    else { customWrap.style.display='none'; chosen=Number(b.dataset.iv); }
+  });
+  const cancel=document.getElementById('cancelCust'); if(cancel) cancel.onclick=closeSheet;
+  const del=document.getElementById('delCust'); if(del) del.onclick=async()=>{
+    if(confirm('Delete this customer and their visits?')){ await deleteCustomer(c.id); toast('Customer deleted'); closeSheet(); render(); }
+  };
+  document.getElementById('saveCust').onclick=async()=>{
+    const iv = chosen==='custom' ? Math.max(1,parseInt(document.getElementById('fIv').value||'7',10)) : chosen;
+    const rec={...c,
+      name:document.getElementById('fName').value.trim()||'Unnamed',
+      address:document.getElementById('fAddr').value.trim(),
+      phone:document.getElementById('fPhone').value.trim(),
+      price:document.getElementById('fPrice').value.trim(),
+      intervalDays:iv,
+      anchorDate:document.getElementById('fAnchor').value||c.anchorDate,
+      source:document.getElementById('fSource').value,
+      notes:document.getElementById('fNotes').value.trim(),
+      active:document.getElementById('fActive')?document.getElementById('fActive').checked:true
+    };
+    document.getElementById('saveCust').textContent='Saving…';
+    if(rec.address && rec.address!==c.address){ const geo=await geocode(rec.address); if(geo){rec.lat=geo.lat;rec.lng=geo.lng;} }
+    await saveCustomer(rec); toast(isNew?'Customer added':'Saved'); closeSheet(); render();
+  };
+}
+
+async function geocode(q){
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q),
+      {headers:{'Accept':'application/json'}});
+    const j=await r.json();
+    if(j&&j[0]) return {lat:parseFloat(j[0].lat),lng:parseFloat(j[0].lon)};
+  }catch(e){}
+  return null;
+}
+
+/* ============================================================
+   5) SHEET / TOAST / UTIL
+   ============================================================ */
+const scrim=document.getElementById('scrim'), sheet=document.getElementById('sheet');
+function openSheet(html){ sheet.innerHTML='<div class="grip"></div>'+html; scrim.classList.add('show'); requestAnimationFrame(()=>sheet.classList.add('show')); }
+function closeSheet(){ sheet.classList.remove('show'); scrim.classList.remove('show'); }
+scrim.onclick=closeSheet;
+let toastT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{currentView=b.dataset.view;render();});
+document.getElementById('addFab').onclick=()=>openCustomerForm(null);
+document.getElementById('modeTag').textContent = usingFirebase ? 'synced' : 'demo mode';
+
+/* boot — gated by passcode */
+const safeStore={
+  get(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+};
+function boot(){
+  const start = async()=>{
+    if(fb && firebase.auth){ try{ await firebase.auth().signInAnonymously(); }catch(e){ console.warn('auth failed',e); } }
+    await loadAll(); render();
+  };
+  start();
+}
+function unlock(){ document.getElementById('lock').classList.add('hidden'); boot(); }
+function tryUnlock(){
+  const inp=document.getElementById('pcInput');
+  if(inp.value===PASSCODE){ safeStore.set('op_unlocked','yes'); unlock(); }
+  else{ document.getElementById('pcErr').style.display='block'; inp.value=''; inp.focus(); }
+}
+document.getElementById('pcBtn').onclick=tryUnlock;
+document.getElementById('pcInput').addEventListener('keydown',e=>{ if(e.key==='Enter') tryUnlock(); });
+if(safeStore.get('op_unlocked')==='yes'){ unlock(); }
+else{ document.getElementById('pcInput').focus(); }
+</script>
+</body>
+</html>
